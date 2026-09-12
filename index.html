@@ -66,6 +66,10 @@
         gap: 8px;
         margin: 12px 0 22px;
       }
+      .modes {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px;padding:5px;background:#edf3f1;border-radius:14px}
+      .modes button{border:0;border-radius:10px;padding:11px;background:transparent;color:#687873;font-weight:700}
+      .modes .on{background:white;color:#116552;box-shadow:0 2px 10px #173c3420}
+      .topic{width:100%;min-height:126px;margin-top:22px;border:1px solid #b7d4cc;border-radius:20px;padding:16px;font:inherit;font-size:16px;resize:none;background:#f8fcfa}
       .choices button,
       .btn {
         border: 1px solid #e2e9e6;
@@ -146,14 +150,15 @@
       </section>
       <section id="studio" class="hide">
         <div class="brand"><span class="logo">✦</span>一刻成片</div>
-        <h1>上传素材，<br />自动生成成片。</h1>
-        <p class="muted">自动提炼重点、删除冗余、生成字幕并输出 9:16 视频。</p>
+        <div class="modes"><button id="titleMode" class="on" onclick="setMode('title')">标题生成</button><button id="uploadMode" onclick="setMode('upload')">视频剪辑</button></div>
+        <div id="titlePanel"><h1>给一个标题，<br />生成完整内容。</h1><p class="muted">自动生成 AI 行业大脑文案、配音、字幕和 9:16 成片。</p><textarea id="topic" class="topic" placeholder="例如：为什么企业需要一套 AI 行业大脑？"></textarea></div>
+        <div id="uploadPanel" class="hide"><h1>上传素材，<br />自动生成成片。</h1><p class="muted">自动提炼重点、删除冗余、生成字幕并输出 9:16 视频。</p>
         <label class="card"
           ><input id="video" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" />
           <div class="upload">↑</div>
           <b id="filename">点击选择 MP4 或 MOV 视频</b>
           <p class="muted">建议原视频不超过 45 分钟</p></label
-        >
+        ></div>
         <h3>成片时长</h3>
         <div class="choices" id="durations">
           <button>30秒</button><button class="on">60秒</button><button>90秒</button
@@ -172,7 +177,7 @@
       const API = "https://api.opc.city";
       let token = "",
         seconds = 60,
-        job = "";
+        job = "", mode = "title";
       const $ = (id) => document.getElementById(id);
       async function login() {
         try {
@@ -192,6 +197,7 @@
       }
       $("video").onchange = (e) =>
         ($("filename").textContent = e.target.files[0]?.name || "点击选择 MP4 或 MOV 视频");
+      function setMode(value){mode=value;$("titlePanel").classList.toggle("hide",value!=="title");$("uploadPanel").classList.toggle("hide",value!=="upload");$("titleMode").classList.toggle("on",value==="title");$("uploadMode").classList.toggle("on",value==="upload");state(value==="title"?"等待输入标题":"等待上传素材",0)}
       [...$("durations").children].forEach(
         (b, i) =>
           (b.onclick = () => {
@@ -205,6 +211,7 @@
         $("bar").style.width = p + "%";
       }
       async function start() {
+        if(mode === "title") return startTitle();
         let f = $("video").files[0];
         if (!f) return $("video").click();
         $("start").disabled = true;
@@ -243,6 +250,8 @@
           $("start").disabled = false;
         }
       }
+      async function startTitle(){let title=$("topic").value.trim();if(!title)return state("请输入标题",0);$("start").disabled=true;state("AI 正在写稿、配音并合成视频…",10);try{let r=await fetch(API+"/title-jobs",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({title,seconds})}),d=await r.json();if(!r.ok)throw Error(d.detail);job=d.id;watch()}catch(e){state(e.message||"生成失败",0);$("start").disabled=false}}
+      function watch(){let timer=setInterval(async()=>{let q=await fetch(API+"/jobs/"+job,{headers:{Authorization:"Bearer "+token}}),x=await q.json();if(x.status==="done"){clearInterval(timer);state("成片已生成，可以下载",100);$("start").classList.add("hide");$("download").classList.remove("hide")}else if(x.status==="failed"){clearInterval(timer);state("生成失败："+x.error,0);$("start").disabled=false}},3000)}
       async function downloadVideo() {
         let r = await fetch(API + "/jobs/" + job + "/download", {
             headers: { Authorization: "Bearer " + token },
