@@ -1,1 +1,259 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>一刻成片</title><style>*{box-sizing:border-box}body{margin:0;background:#eef3f0;color:#13211e;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.app{max-width:460px;min-height:100vh;margin:auto;background:white;padding:22px 20px}.brand{display:flex;align-items:center;gap:10px;font-weight:800}.logo{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:#116552;color:white}h1{font-size:30px;line-height:1.12;margin:32px 0 10px}.muted{color:#687873;font-size:13px;line-height:1.7}.card{margin-top:22px;padding:34px 18px;border:1px dashed #7ab3a5;border-radius:24px;background:#edf8f4;text-align:center}.card input{display:none}.upload{font-size:32px}.choices{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 22px}.choices button,.btn{border:1px solid #e2e9e6;border-radius:12px;background:white;padding:11px 5px}.choices .on,.btn{background:#116552;color:white}.btn{width:100%;border:0;font-weight:700;font-size:14px;padding:15px;margin-top:18px}.btn:disabled{opacity:.55}.status{margin:24px -20px -22px;padding:20px;background:#f7f9f8}.bar{height:7px;background:#dce5e2;border-radius:9px;overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;width:0;background:#116552;transition:.3s}.login{margin-top:25vh}.field{width:100%;height:48px;border:1px solid #dce5e2;border-radius:12px;margin-top:12px;padding:0 14px;font-size:15px}.error{color:#bd2424;font-size:13px}.hide{display:none}</style></head><body><main class="app"><section id="login" class="login"><div class="logo">✦</div><h1>登录一刻成片</h1><p class="muted">使用管理员设置的账号和密码</p><input id="user" class="field" value="admin" placeholder="账号"><input id="pass" class="field" type="password" placeholder="密码"><p id="err" class="error"></p><button class="btn" onclick="login()">登录</button></section><section id="studio" class="hide"><div class="brand"><span class="logo">✦</span>一刻成片</div><h1>上传素材，<br>自动生成成片。</h1><p class="muted">自动提炼重点、删除冗余、生成字幕并输出 9:16 视频。</p><label class="card"><input id="video" type="file" accept="video/mp4"><div class="upload">↑</div><b id="filename">点击选择 MP4 视频</b><p class="muted">建议原视频不超过 45 分钟</p></label><h3>成片时长</h3><div class="choices" id="durations"><button>30秒</button><button class="on">60秒</button><button>90秒</button><button>3分钟</button></div><button id="start" class="btn" onclick="start()">开始生成成片</button><button id="download" class="btn hide" onclick="downloadVideo()">下载成片</button><div class="status"><small>当前任务</small><div id="status">等待上传素材</div><div class="bar"><i id="bar"></i></div></div></section></main><script>const API='https://api.opc.city';let token='',seconds=60,job='';const $=id=>document.getElementById(id);async function login(){try{let r=await fetch(API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('user').value,password:$('pass').value})}),d=await r.json();if(!r.ok)throw Error(d.detail);token=d.token;$('login').classList.add('hide');$('studio').classList.remove('hide')}catch(e){$('err').textContent=e.message||'登录失败'}}$('video').onchange=e=>$('filename').textContent=e.target.files[0]?.name||'点击选择 MP4 视频';[...$('durations').children].forEach((b,i)=>b.onclick=()=>{seconds=[30,60,90,180][i];[...b.parentNode.children].forEach(x=>x.classList.remove('on'));b.classList.add('on')});function state(t,p){$('status').textContent=t;$('bar').style.width=p+'%'}async function start(){let f=$('video').files[0];if(!f)return $('video').click();$('start').disabled=true;state('正在上传视频…',3);let form=new FormData();form.append('video',f);form.append('seconds',seconds);try{let r=await fetch(API+'/jobs',{method:'POST',headers:{Authorization:'Bearer '+token},body:form}),d=await r.json();if(!r.ok)throw Error(d.detail);job=d.id;state('AI 正在自动剪辑…',12);let timer=setInterval(async()=>{let q=await fetch(API+'/jobs/'+job,{headers:{Authorization:'Bearer '+token}}),x=await q.json();if(x.status==='done'){clearInterval(timer);state('成片已生成，可以下载',100);$('start').classList.add('hide');$('download').classList.remove('hide')}else if(x.status==='failed'){clearInterval(timer);state('生成失败：'+x.error,0);$('start').disabled=false}},3000)}catch(e){state(e.message||'上传失败',0);$('start').disabled=false}}async function downloadVideo(){let r=await fetch(API+'/jobs/'+job+'/download',{headers:{Authorization:'Bearer '+token}}),u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download='一刻成片.mp4';a.click();URL.revokeObjectURL(u)}</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>一刻成片</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eef3f0;
+        color: #13211e;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .app {
+        max-width: 460px;
+        min-height: 100vh;
+        margin: auto;
+        background: white;
+        padding: 22px 20px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+      }
+      .logo {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 13px;
+        background: #116552;
+        color: white;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.12;
+        margin: 32px 0 10px;
+      }
+      .muted {
+        color: #687873;
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .card {
+        margin-top: 22px;
+        padding: 34px 18px;
+        border: 1px dashed #7ab3a5;
+        border-radius: 24px;
+        background: #edf8f4;
+        text-align: center;
+      }
+      .card input {
+        display: none;
+      }
+      .upload {
+        font-size: 32px;
+      }
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin: 12px 0 22px;
+      }
+      .choices button,
+      .btn {
+        border: 1px solid #e2e9e6;
+        border-radius: 12px;
+        background: white;
+        padding: 11px 5px;
+      }
+      .choices .on,
+      .btn {
+        background: #116552;
+        color: white;
+      }
+      .btn {
+        width: 100%;
+        border: 0;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 15px;
+        margin-top: 18px;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+      }
+      .status {
+        margin: 24px -20px -22px;
+        padding: 20px;
+        background: #f7f9f8;
+      }
+      .bar {
+        height: 7px;
+        background: #dce5e2;
+        border-radius: 9px;
+        overflow: hidden;
+        margin-top: 12px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #116552;
+        transition: 0.3s;
+      }
+      .login {
+        margin-top: 25vh;
+      }
+      .field {
+        width: 100%;
+        height: 48px;
+        border: 1px solid #dce5e2;
+        border-radius: 12px;
+        margin-top: 12px;
+        padding: 0 14px;
+        font-size: 15px;
+      }
+      .error {
+        color: #bd2424;
+        font-size: 13px;
+      }
+      .hide {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section id="login" class="login">
+        <div class="logo">✦</div>
+        <h1>登录一刻成片</h1>
+        <p class="muted">使用管理员设置的账号和密码</p>
+        <input id="user" class="field" value="admin" placeholder="账号" /><input
+          id="pass"
+          class="field"
+          type="password"
+          placeholder="密码"
+        />
+        <p id="err" class="error"></p>
+        <button class="btn" onclick="login()">登录</button>
+      </section>
+      <section id="studio" class="hide">
+        <div class="brand"><span class="logo">✦</span>一刻成片</div>
+        <h1>上传素材，<br />自动生成成片。</h1>
+        <p class="muted">自动提炼重点、删除冗余、生成字幕并输出 9:16 视频。</p>
+        <label class="card"
+          ><input id="video" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" />
+          <div class="upload">↑</div>
+          <b id="filename">点击选择 MP4 或 MOV 视频</b>
+          <p class="muted">建议原视频不超过 45 分钟</p></label
+        >
+        <h3>成片时长</h3>
+        <div class="choices" id="durations">
+          <button>30秒</button><button class="on">60秒</button><button>90秒</button
+          ><button>3分钟</button>
+        </div>
+        <button id="start" class="btn" onclick="start()">开始生成成片</button
+        ><button id="download" class="btn hide" onclick="downloadVideo()">下载成片</button>
+        <div class="status">
+          <small>当前任务</small>
+          <div id="status">等待上传素材</div>
+          <div class="bar"><i id="bar"></i></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      const API = "https://api.opc.city";
+      let token = "",
+        seconds = 60,
+        job = "";
+      const $ = (id) => document.getElementById(id);
+      async function login() {
+        try {
+          let r = await fetch(API + "/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: $("user").value, password: $("pass").value }),
+            }),
+            d = await r.json();
+          if (!r.ok) throw Error(d.detail);
+          token = d.token;
+          $("login").classList.add("hide");
+          $("studio").classList.remove("hide");
+        } catch (e) {
+          $("err").textContent = e.message || "登录失败";
+        }
+      }
+      $("video").onchange = (e) =>
+        ($("filename").textContent = e.target.files[0]?.name || "点击选择 MP4 或 MOV 视频");
+      [...$("durations").children].forEach(
+        (b, i) =>
+          (b.onclick = () => {
+            seconds = [30, 60, 90, 180][i];
+            [...b.parentNode.children].forEach((x) => x.classList.remove("on"));
+            b.classList.add("on");
+          }),
+      );
+      function state(t, p) {
+        $("status").textContent = t;
+        $("bar").style.width = p + "%";
+      }
+      async function start() {
+        let f = $("video").files[0];
+        if (!f) return $("video").click();
+        $("start").disabled = true;
+        state("正在上传视频…", 3);
+        let form = new FormData();
+        form.append("video", f);
+        form.append("seconds", seconds);
+        try {
+          let r = await fetch(API + "/jobs", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + token },
+              body: form,
+            }),
+            d = await r.json();
+          if (!r.ok) throw Error(d.detail);
+          job = d.id;
+          state("AI 正在自动剪辑…", 12);
+          let timer = setInterval(async () => {
+            let q = await fetch(API + "/jobs/" + job, {
+                headers: { Authorization: "Bearer " + token },
+              }),
+              x = await q.json();
+            if (x.status === "done") {
+              clearInterval(timer);
+              state("成片已生成，可以下载", 100);
+              $("start").classList.add("hide");
+              $("download").classList.remove("hide");
+            } else if (x.status === "failed") {
+              clearInterval(timer);
+              state("生成失败：" + x.error, 0);
+              $("start").disabled = false;
+            }
+          }, 3000);
+        } catch (e) {
+          state(e.message || "上传失败", 0);
+          $("start").disabled = false;
+        }
+      }
+      async function downloadVideo() {
+        let r = await fetch(API + "/jobs/" + job + "/download", {
+            headers: { Authorization: "Bearer " + token },
+          }),
+          u = URL.createObjectURL(await r.blob()),
+          a = document.createElement("a");
+        a.href = u;
+        a.download = "一刻成片.mp4";
+        a.click();
+        URL.revokeObjectURL(u);
+      }
+    </script>
+  </body>
+</html>
